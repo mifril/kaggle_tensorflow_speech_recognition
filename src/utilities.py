@@ -46,7 +46,7 @@ from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import train_test_split
 
-def load_train_val_data():
+def load_train_val_data_new():
     """ Return 2 lists of tuples:
     [(class_id, user_id, path), ...] for train
     [(class_id, user_id, path), ...] for validation
@@ -112,7 +112,7 @@ def load_train_val_data():
     return train, val, test
 
 # https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
-def load_train_val_data_no_unknown_in_val():
+def load_train_val_data():
     """ Return 2 lists of tuples:
     [(class_id, user_id, path), ...] for train
     [(class_id, user_id, path), ...] for validation

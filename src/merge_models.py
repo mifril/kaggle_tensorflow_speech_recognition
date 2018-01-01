@@ -145,5 +145,6 @@ if __name__ == '__main__':
     else:
         weights = None
     
-    pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199', 'xception']
+    # pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199', 'xception', 'inception', 'vgg19']
+    pred_files = ['resnet50', 'resnet50_224', 'incres_140', 'incres_199', 'xception', 'inception']
     mean(pred_files, args.out_file, weights)

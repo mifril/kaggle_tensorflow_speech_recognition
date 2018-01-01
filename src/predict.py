@@ -14,7 +14,7 @@ import gc
 def dump_preds(preds, preds_file):
     if not os.path.exists(PREDS_DIR):
         os.makedirs(PREDS_DIR)
-    pd.DataFrame(preds).to_csv(os.path.join(PREDS_DIR, '_' + preds_file + '.csv'), index=False, header=False)
+    pd.DataFrame(preds).to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index=False, header=False)
 
 def predict(args, batch_size=32, wdir=None, tta=1):
     model_name = args.model
