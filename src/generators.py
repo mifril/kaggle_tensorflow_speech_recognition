@@ -1,8 +1,7 @@
 import numpy as np
 
 from utilities import *
-from tensorflow import keras
-from keras.utils import to_categorical
+from tensorflow.python.keras.utils import to_categorical
 
 def data_generator(data, batch_size, audio_transformer, mode='train'):
     if mode == 'train':

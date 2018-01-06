@@ -11,7 +11,6 @@ import gc
 import cv2
 
 import tensorflow as tf
-from keras import backend as K
 import random as rn
 
 INPUT_DIR = '..//input//'

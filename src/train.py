@@ -6,8 +6,7 @@ from generators import *
 from utilities import *
 from models import *
 
-from tensorflow import keras
-from keras.callbacks import *
+from tensorflow.python.keras.callbacks import *
 
 from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
 
