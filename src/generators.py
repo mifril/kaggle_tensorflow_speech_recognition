@@ -31,6 +31,42 @@ def data_generator(data, batch_size, audio_transformer, mode='train'):
         y_batch = to_categorical(y_batch, num_classes = len(LABELS))
         yield x_batch, y_batch
 
+def data_generator2(data, batch_size, audio_transformer, mode='train'):
+    if mode == 'train':
+        np.random.shuffle(data)
+    X = []
+    y = []
+    fnames = []
+    for (label_id, uid, fname) in data:
+        X.append(audio_transformer.load_wav(fname))
+        y.append(label_id)
+        fnames.append(fname)
+
+    while True:
+        cur = 0
+        x_batch = []
+        y_batch = []
+
+        for wav, label_id, fname in zip(X, y, fnames):
+            if cur > 0 and cur % batch_size == 0:
+                x_batch = np.array(x_batch)
+                x_batch = x_batch.reshape(tuple(list(x_batch.shape) + [1]))
+                y_batch = to_categorical(y_batch, num_classes = len(LABELS))
+                # print(x_batch.shape, y_batch.shape)
+                yield x_batch, y_batch
+                
+                x_batch = []
+                y_batch = []
+                cur = 0
+            
+            x_batch.append(audio_transformer.process_wav(wav, fname, label_id, mode, normalize=True))
+            y_batch.append(label_id)
+            cur += 1
+        x_batch = np.array(x_batch)
+        x_batch = x_batch.reshape(tuple(list(x_batch.shape) + [1]))
+        y_batch = to_categorical(y_batch, num_classes = len(LABELS))
+        yield x_batch, y_batch
+
 # better if batch_sie % tta == 0
 def test_generator(files, batch_size, audio_transformer, tta=1):
     if tta < batch_size:

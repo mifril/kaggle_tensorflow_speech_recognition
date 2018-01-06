@@ -13,14 +13,23 @@ import cv2
 import tensorflow as tf
 import random as rn
 
-INPUT_DIR = '..//input//'
-OUTPUT_DIR = '..//output//'
-MAIN_DIR = 'C://data//tf_speech//'
-TRAIN_DIR = MAIN_DIR + 'train//'
-TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio//'
-BG_DIR = TRAIN_DIR + 'audio//_background_noise_//'
-TEST_DIR = MAIN_DIR + 'test//audio//'
-PREDS_DIR = '..//output//preds//'
+# INPUT_DIR = '..//input//'
+# OUTPUT_DIR = '..//output//'
+# MAIN_DIR = 'C://data//tf_speech//'
+# TRAIN_DIR = MAIN_DIR + 'train//'
+# TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio//'
+# BG_DIR = TRAIN_DIR + 'audio//_background_noise_//'
+# TEST_DIR = MAIN_DIR + 'test//audio//'
+# PREDS_DIR = '..//output//preds//'
+
+INPUT_DIR = '../input/'
+OUTPUT_DIR = '../output/'
+MAIN_DIR = 'C:/data/tf_speech/'
+TRAIN_DIR = MAIN_DIR + 'train/'
+TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio/'
+BG_DIR = TRAIN_DIR + 'audio//_background_noise_/'
+TEST_DIR = MAIN_DIR + 'test/audio/'
+PREDS_DIR = '../output/preds/'
 
 LABELS = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'silence', 'unknown']
 ID2NAME = {i: name for i, name in enumerate(LABELS)}
@@ -56,6 +65,62 @@ def balance_unknown(data):
     labels = np.array([s[0] for s in data])
     parts = [len(labels[labels == l]) / len(labels) for l in range(len(LABELS))]
     return data
+
+# https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
+def load_train_val_data():
+    """ Return 2 lists of tuples:
+    [(class_id, user_id, path), ...] for train
+    [(class_id, user_id, path), ...] for validation
+    """
+    # Just a simple regexp for paths with three groups:
+    # prefix, label, user_id
+    pattern = re.compile("C://(.+/)?(\w+)/([^_]+)_.+wav")
+    all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
+
+    with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
+        validation_files = fin.readlines()
+    valset = set()
+    for fname in validation_files:
+        splits = fname.split('/')
+        valset.add(splits[-1].split('_')[0].rstrip())
+    print(valset)
+    train, val = [], []
+    noise = [(NAME2ID['silence'], '', '')]
+    for fname in all_files:
+        splits = fname.split('\\')
+        label, uid = splits[-2], splits[-1].split('_')[0]
+        if label == '_background_noise_':
+            label = 'silence'
+        if label not in LABELS:
+            label = 'unknown'
+
+        label_id = NAME2ID[label]
+
+        sample = (label_id, uid, fname)
+        # print (uid)
+        if uid in valset:
+            if label != 'unknown':
+                val.append(sample)
+        elif label == 'silence':
+            noise.append(sample)
+        else:
+            train.append(sample)
+
+    print('There are {} train and {} val samples'.format(len(train), len(val)))
+
+    noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
+    n_noise_type_train = int(noise_type_percent * len(train))
+    n_noise_type_val = int(noise_type_percent * len(val))
+
+    for sample in noise:
+        for i in range(n_noise_type_train):
+            train.append(sample)
+        for i in range(n_noise_type_val):
+            val.append(sample)
+
+    print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
+    return train, val, None
+
 
 def load_train_val_data_new():
     """ Return 2 lists of tuples:
@@ -128,58 +193,61 @@ def load_train_val_data_new():
     return train, val, test
 
 # https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
-def load_train_val_data():
-    """ Return 2 lists of tuples:
-    [(class_id, user_id, path), ...] for train
-    [(class_id, user_id, path), ...] for validation
-    """
-    # Just a simple regexp for paths with three groups:
-    # prefix, label, user_id
-    pattern = re.compile("C://(.+\\)?(\w+)\\([^_]+)_.+wav")
-    all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
+# def load_train_val_data():
+#     """ Return 2 lists of tuples:
+#     [(class_id, user_id, path), ...] for train
+#     [(class_id, user_id, path), ...] for validation
+#     """
+#     # Just a simple regexp for paths with three groups:
+#     # prefix, label, user_id
+#     pattern = re.compile("C://(.+\\)?(\w+)\\([^_]+)_.+wav")
+#     all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
 
-    with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
-        validation_files = fin.readlines()
-    valset = set()
-    for fname in validation_files:
-        splits = fname.split('\\')
-        valset.add(splits[-1].rstrip())
+#     with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
+#         validation_files = fin.readlines()
+#     valset = set()
+#     for fname in validation_files:
+#         splits = fname.split('\\')
+#         valset.add(splits[-1].rstrip())
 
-    train, val = [], []
-    noise = [(NAME2ID['silence'], '', '')]
-    for fname in all_files:
-        splits = fname.split('\\')
-        label, uid = splits[-2], splits[-1]
-        if label == '_background_noise_':
-            label = 'silence'
-        if label not in LABELS:
-            label = 'unknown'
+#     print(valset)
+#     print(len(valset))
+#     train, val = [], []
+#     noise = [(NAME2ID['silence'], '', '')]
+#     for fname in all_files:
+#         splits = fname.split('\\')
+#         label, uid = splits[-2], splits[-1]
+#         if label == '_background_noise_':
+#             label = 'silence'
+#         if label not in LABELS:
+#             label = 'unknown'
 
-        label_id = NAME2ID[label]
+#         label_id = NAME2ID[label]
 
-        sample = (label_id, uid, fname)
-        # print (uid)
-        if label + '/' + uid in valset:
-            val.append(sample)
-        elif label == 'silence':
-            noise.append(sample)
-        else:
-            train.append(sample)
+#         sample = (label_id, uid, fname)
+#         # print (uid)
+#         if label + '/' + uid in valset:
+#             print(label + '/' + uid)
+#             val.append(sample)
+#         elif label == 'silence':
+#             noise.append(sample)
+#         else:
+#             train.append(sample)
 
-    print('There are {} train and {} val samples'.format(len(train), len(val)))
+#     print('There are {} train and {} val samples'.format(len(train), len(val)))
 
-    noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
-    n_noise_type_train = int(noise_type_percent * len(train))
-    n_noise_type_val = int(noise_type_percent * len(val))
+#     noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
+#     n_noise_type_train = int(noise_type_percent * len(train))
+#     n_noise_type_val = int(noise_type_percent * len(val))
 
-    for sample in noise:
-        for i in range(n_noise_type_train):
-            train.append(sample)
-        for i in range(n_noise_type_val):
-            val.append(sample)
+#     for sample in noise:
+#         for i in range(n_noise_type_train):
+#             train.append(sample)
+#         for i in range(n_noise_type_val):
+#             val.append(sample)
 
-    print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
-    return train, val, None
+#     print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
+#     return train, val, None
 
 def prepare_settings(args, resize=None):
     settings = dict()
@@ -275,6 +343,44 @@ class AudioTransformer:
         elif len(wav) < LENGTH:
             wav = self.pad_audio(wav)
 
+        if mode == 'train' and fname != '':
+            wav = self.apply_augmentation(wav, label_id)
+
+        if self.spect == 'scipy':
+            specgram = spectrogram(wav, LENGTH, nperseg=self.win_size, noverlap=self.win_stride, nfft=self.win_size)
+            spect = np.log(specgram[2].astype(np.float32) + EPS)
+        elif self.spect == 'librosa':
+            spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=129, hop_length=130, n_fft=480)
+            spect = librosa.logamplitude(spect)
+        else:
+            spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=40, hop_length=160, n_fft=480)
+            spect = librosa.logamplitude(spect)
+
+        if normalize:
+            mean = spect.mean()
+            std = spect.std()
+            spect = (spect - mean) / (std + EPS)
+
+        if self.resize:
+            spect = cv2.resize(spect, self.resize_shape)
+
+        return spect
+
+    def load_wav(self, fname):
+        if fname == '':
+            wav = np.zeros(shape=(LENGTH,))
+        else:
+            _, wav = wavfile.read(fname)
+            wav = wav.astype(np.float32) / np.iinfo(np.int16).max
+
+        if len(wav) > LENGTH:
+            i = np.random.randint(0, len(wav) - LENGTH)
+            wav = wav[i : i + LENGTH]
+        elif len(wav) < LENGTH:
+            wav = self.pad_audio(wav)
+        return wav
+
+    def process_wav(self, wav, fname, label_id=None, mode='train', normalize=True):
         if mode == 'train' and fname != '':
             wav = self.apply_augmentation(wav, label_id)
 
