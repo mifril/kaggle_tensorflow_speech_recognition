@@ -4,6 +4,7 @@ import numpy as np
 from scipy.fftpack import fft
 from scipy.io import wavfile
 from scipy.signal import *
+import librosa
 import re
 import pandas as pd
 import gc
@@ -32,6 +33,9 @@ RS = 17
 EPS = 1e-12
 
 SILENCE_PERCENT = .09
+UNKNOWN_PERCENT = .09
+
+from sklearn.model_selection import train_test_split
 
 def set_seeds():
     os.environ['PYTHONHASHSEED'] = '0'
@@ -42,9 +46,17 @@ def set_seeds():
     sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
     K.set_session(sess)
 
-from sklearn.model_selection import train_test_split
+def balance_unknown(data):
+    labels = np.array([s[0] for s in data])
+    labels_u_i = np.argwhere(labels == NAME2ID['unknown']).flatten()
+    assert((labels[labels == NAME2ID['unknown']] == labels[labels_u_i]).all())
 
-from sklearn.model_selection import train_test_split
+    u_part = len(labels[labels == NAME2ID['unknown']]) / len(labels)
+    labels_u_i_not_needed = np.random.choice(labels_u_i, int(0.93 * len(labels_u_i)), replace=False)
+    data = [x for i, x in enumerate(data) if i not in labels_u_i_not_needed]
+    labels = np.array([s[0] for s in data])
+    parts = [len(labels[labels == l]) / len(labels) for l in range(len(LABELS))]
+    return data
 
 def load_train_val_data_new():
     """ Return 2 lists of tuples:
@@ -60,8 +72,8 @@ def load_train_val_data_new():
         if splits[-2] != '_background_noise_':
             speakers.append(splits[-1].split('_')[0])
     speakers = np.unique(speakers)
-    train_speakers, val_speakers = train_test_split(speakers, test_size=0.3, random_state=RS)
-    val_speakers, test_speakers = train_test_split(val_speakers, test_size=0.33, random_state=RS)
+    train_speakers, val_speakers = train_test_split(speakers, test_size=0.2, random_state=RS)
+    val_speakers, test_speakers = train_test_split(val_speakers, test_size=0.5, random_state=RS)
     
     train, val, test = [], [], []
     noise = []
@@ -87,6 +99,9 @@ def load_train_val_data_new():
 
     print('There are {} train, {} val, {} test samples'.format(len(train), len(val), len(test)))
 
+    val = balance_unknown(val)
+    test = balance_unknown(test)
+    
     noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / len(noise)
     n_noise_type_train = int(noise_type_percent * len(train))
     n_noise_type_val = int(noise_type_percent * len(val))
@@ -101,14 +116,16 @@ def load_train_val_data_new():
             test.append(sample)
 
     print('There are {} train, {} val, {} test samples after adding SILENCE'.format(len(train), len(val), len(test)))
-    
     train_labels = np.array([s[0] for s in train])
     val_labels = np.array([s[0] for s in val])
     test_labels = np.array([s[0] for s in val])
     train_parts = [len(train_labels[train_labels == l]) / len(train_labels) for l in range(len(LABELS))]
-#     val_parts = [len(val_labels[val_labels == l]) / len(val_labels) for l in range(len(LABELS))]
-#     test_parts = [len(test_labels[test_labels == l]) / len(test_labels) for l in range(len(LABELS))]
-    print(train_parts)
+    val_parts = [len(val_labels[val_labels == l]) / len(val_labels) for l in range(len(LABELS))]
+    test_parts = [len(test_labels[test_labels == l]) / len(test_labels) for l in range(len(LABELS))]
+    print('TRAIN: ', train_parts)
+    print('VAL: ', val_parts)
+    print('HO: ', test_parts)
+    
     return train, val, test
 
 # https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
@@ -172,6 +189,7 @@ def prepare_settings(args, resize=None):
     settings['resize'] = args.resize
     settings['resize_w'] = args.resize_w
     settings['resize_h'] = args.resize_h
+    settings['spect'] = args.spect
     settings['time_shift_p'] = args.time_shift_p
     settings['speed_tune_p'] = args.speed_tune_p
     settings['mix_with_bg_p'] = args.mix_with_bg_p
@@ -186,6 +204,7 @@ class AudioTransformer:
         self.time_shift_p = settings['time_shift_p']
         self.speed_tune_p = settings['speed_tune_p']
         self.mix_with_bg_p = settings['mix_with_bg_p']
+        self.spect = settings['spect']
         self.bg_noises = self.load_bg_noises()
 
     def load_bg_noises(self):
@@ -260,13 +279,16 @@ class AudioTransformer:
         if mode == 'train' and fname != '':
             wav = self.apply_augmentation(wav, label_id)
 
-        # specgram = stft(wav, LENGTH, nperseg=self.win_size, noverlap=self.win_stride, nfft=self.win_size, padded=False, boundary=None)
-        # phase = np.angle(specgram[2]) / np.pi
-        # amp = np.log1p(np.abs(specgram[2]))
-        # spect = np.stack([phase, amp], axis=2)
+        if self.spect == 'scipy':
+            specgram = spectrogram(wav, LENGTH, nperseg=self.win_size, noverlap=self.win_stride, nfft=self.win_size)
+            spect = np.log(specgram[2].astype(np.float32) + EPS)
+        elif self.spect == 'librosa':
+            spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=129, hop_length=130, n_fft=480)
+            spect = librosa.logamplitude(spect)
+        else:
+            spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=40, hop_length=160, n_fft=480)
+            spect = librosa.logamplitude(spect)
 
-        specgram = spectrogram(wav, LENGTH, nperseg=self.win_size, noverlap=self.win_stride, nfft=self.win_size)
-        spect = np.log(specgram[2].astype(np.float32) + EPS)
         if normalize:
             mean = spect.mean()
             std = spect.std()

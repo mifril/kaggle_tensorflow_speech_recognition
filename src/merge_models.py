@@ -26,6 +26,12 @@ def mean(files, out_file, weights=None):
     files = glob.glob(os.path.join(TEST_DIR, '*.wav'))
     files = [f.split('\\')[-1] for f in files]
     classes = np.argmax(preds, axis=1)
+
+    POST_PROCESS = True
+    if POST_PROCESS:
+        for l in range(len(LABELS) - 1):
+            classes[np.logical_and(classes == 11, preds[:,l] > 0.25)] = l
+        # classes[np.logical_and(classes != 10, preds[:,10] > 0.26)] = 10
     # print(preds[2:3])
 
     with open(os.path.join(OUTPUT_DIR, '{}.csv'.format(out_file)), 'w') as fout:

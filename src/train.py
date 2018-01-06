@@ -13,8 +13,12 @@ from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
 
 import gc
 
+
 def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_rate=0.5, wdir=None):   
-    trainset, valset, hoset = load_train_val_data()
+    if args.loader == 'new':
+        trainset, valset, hoset = load_train_val_data_new()
+    else:
+        trainset, valset, hoset = load_train_val_data()
     n_train = len(trainset)
     n_val = len(valset)
 
@@ -90,6 +94,8 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--resize", action="store_true", help="resize image if True")
     parser.add_argument("--resize_w", type=int, default=199, help="resize width")
     parser.add_argument("--resize_h", type=int, default=199, help="resize height")
+    parser.add_argument("--loader", type=str, default="old", help="data loader type")
+    parser.add_argument("--spect", type=str, default="scipy", help="spectrogram type")
 
     parser.add_argument("--win_size", type=int, default=256, help="stft window size")
     parser.add_argument("--win_stride", type=int, default=128, help="stft window stride")

@@ -11,10 +11,54 @@ from models import *
 
 import gc
 
+from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
+
 def dump_preds(preds, preds_file):
     if not os.path.exists(PREDS_DIR):
         os.makedirs(PREDS_DIR)
     pd.DataFrame(preds).to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index=False, header=False)
+
+def predict_val(args, batch_size=32, wdir=None, tta=1):
+    if args.loader == 'new':
+        trainset, valset, hoset = load_train_val_data_new()
+    else:
+        trainset, valset, hoset = load_train_val_data()
+
+    model_name = args.model
+    # default win_size and win_stride
+    shape = (129, 124, 1)
+    # 480_160
+    # shape = (241, 49, 1)
+
+    # resnet50
+    if args.resize:
+        shape = (args.resize_w, args.resize_h, 1)
+
+    model_f = get_model_f(model_name)
+    model = get_model(model_f, shape)
+    load_best_weights_min(model, model_name, wdir=wdir)
+
+    settings = prepare_settings(args)
+    audio_transformer = AudioTransformer(settings)
+
+    if hoset is not None:
+        hofiles = [v[2] for v in hoset]
+        labels = [v[0] for v in hoset]
+        y_ho = to_categorical(labels, num_classes = len(LABELS))
+        
+        ho_preds = model.predict_generator(test_generator(hofiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(hofiles) / batch_size)), verbose=1)
+        print('HOLD OUT: loss = {}, acc = {}'.format(log_loss(y_ho, ho_preds), accuracy_score(labels, np.argmax(ho_preds, axis=1))))
+        print(confusion_matrix(labels, np.argmax(ho_preds, axis=1)))
+        dump_preds(ho_preds, 'ho_' + args.preds_file)
+    else:
+        valfiles = [v[2] for v in valset]
+        labels = [v[0] for v in valset]
+        y_val = to_categorical(labels, num_classes = len(LABELS))
+        
+        ho_preds = model.predict_generator(test_generator(valfiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(valfiles) / batch_size)), verbose=1)
+        print('HOLD OUT: loss = {}, acc = {}'.format(log_loss(y_val, val_preds), accuracy_score(labels, np.argmax(val_preds, axis=1))))
+        print(confusion_matrix(labels, np.argmax(val_preds, axis=1)))
+        dump_preds(val_preds, 'val_' + args.preds_file)
 
 def predict(args, batch_size=32, wdir=None, tta=1):
     model_name = args.model
@@ -67,6 +111,7 @@ if __name__ == '__main__':
     parser.add_argument("-r", "--resize", action="store_true", help="resize image if True")
     parser.add_argument("--resize_w", type=int, default=199, help="resize width")
     parser.add_argument("--resize_h", type=int, default=199, help="resize height")
+    parser.add_argument("--loader", type=str, default="old", help="resize height")
 
     parser.add_argument('--win_size', type=int, default=256, help='stft window size')
     parser.add_argument('--win_stride', type=int, default=128, help='stft window stride')
@@ -76,6 +121,7 @@ if __name__ == '__main__':
     parser.add_argument('--mix_with_bg_p', type=float, default=0, help='mix with background augmentation probability')
     args = parser.parse_args()
 
+    predict_val(args, batch_size=args.batch, wdir=args.wdir, tta=args.tta)
     predict(args, batch_size=args.batch, wdir=args.wdir, tta=args.tta)
 
     gc.collect()
