@@ -13,7 +13,7 @@ import gc
 
 from sklearn.metrics import log_loss, accuracy_score
 
-def mean(files, out_file, weights=None):
+def mean(files, out_file, weights=None, p_rate=0.0):
     preds = np.array([pd.read_csv(os.path.join(PREDS_DIR, f + '.csv'), header=None).values for f in files])
     print(preds[0].shape)
     # print(preds[0, 2:3])
@@ -25,18 +25,21 @@ def mean(files, out_file, weights=None):
 
     files = glob.glob(os.path.join(TEST_DIR, '*.wav'))
     files = [f.split('\\')[-1] for f in files]
-    classes = np.argmax(preds, axis=1)
+    pred_classes = np.argmax(preds, axis=1)
 
-    POST_PROCESS = True
-    if POST_PROCESS:
+    if p_rate > 0.0:
         for l in range(len(LABELS) - 1):
-            classes[np.logical_and(classes == 11, preds[:,l] > 0.25)] = l
-        # classes[np.logical_and(classes != 10, preds[:,10] > 0.26)] = 10
-    # print(preds[2:3])
+            cond = np.logical_and(pred_classes == 11, preds[:,l] > p_rate)
+            preds[np.where(cond)[0], 11] = 0.0
+        pred_classes = np.argmax(preds, axis=1)
+        # for l in range(len(LABELS) - 1):
+        #     classes[np.logical_and(classes == 11, preds[:,l] > p_rate)] = l
+
+    dump_preds(preds, 'mean_' + out_file, files)
 
     with open(os.path.join(OUTPUT_DIR, '{}.csv'.format(out_file)), 'w') as fout:
         fout.write('fname,label\n')
-        for fname, label in zip(files, classes):
+        for fname, label in zip(files, pred_classes):
             fout.write('{},{}\n'.format(fname, ID2NAME[label]))
 
 def search_alpha_itr(preds_1, preds_2, y_val, test_on_acc=False):
@@ -110,6 +113,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_file', type=str, default='out', help='submission file')
     parser.add_argument('-w', '--weighted', action='store_true', help='if True - weighted mean')
     parser.add_argument('-a', '--acc', action='store_true', help='if True - choose alpha testing on accuracy score')
+    parser.add_argument("--p_rate", type=float, default=0.0, help="learning rate reduce rate")
     args = parser.parse_args()
 
     if args.weighted:
@@ -151,6 +155,6 @@ if __name__ == '__main__':
     else:
         weights = None
     
-    # pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199', 'xception', 'inception', 'vgg19']
-    pred_files = ['resnet50', 'resnet50_224', 'incres_140', 'incres_199', 'xception', 'inception']
-    mean(pred_files, args.out_file, weights)
+    pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
+              'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa']
+    mean(pred_files, args.out_file, weights, args.p_rate)

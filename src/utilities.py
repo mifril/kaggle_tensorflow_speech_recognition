@@ -11,25 +11,20 @@ import gc
 import cv2
 
 import tensorflow as tf
+from keras import backend as K
 import random as rn
-
-# INPUT_DIR = '..//input//'
-# OUTPUT_DIR = '..//output//'
-# MAIN_DIR = 'C://data//tf_speech//'
-# TRAIN_DIR = MAIN_DIR + 'train//'
-# TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio//'
-# BG_DIR = TRAIN_DIR + 'audio//_background_noise_//'
-# TEST_DIR = MAIN_DIR + 'test//audio//'
-# PREDS_DIR = '..//output//preds//'
 
 INPUT_DIR = '../input/'
 OUTPUT_DIR = '../output/'
 MAIN_DIR = 'C:/data/tf_speech/'
 TRAIN_DIR = MAIN_DIR + 'train/'
+TRAIN_MODIFIED_DIR = MAIN_DIR + 'train_modified/'
+TRAIN_MODIFIED_AUDIO_DIR = TRAIN_MODIFIED_DIR + 'audio/'
 TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio/'
-BG_DIR = TRAIN_DIR + 'audio//_background_noise_/'
+BG_DIR = TRAIN_DIR + 'audio/_background_noise_/'
 TEST_DIR = MAIN_DIR + 'test/audio/'
 PREDS_DIR = '../output/preds/'
+KFOLD_FILENAME = 'kfold_cache_4.pklz'
 
 LABELS = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'silence', 'unknown']
 ID2NAME = {i: name for i, name in enumerate(LABELS)}
@@ -66,15 +61,39 @@ def balance_unknown(data):
     parts = [len(labels[labels == l]) / len(labels) for l in range(len(LABELS))]
     return data
 
+def load_fold(fold):
+    train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
+    val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
+    
+    all_files = glob.glob(os.path.join(TRAIN_MODIFIED_AUDIO_DIR, '*/*wav'))
+
+    train, val = [], []
+    for fname in all_files:
+        splits = fname.split('\\')
+        label, uid = splits[-2], splits[-1].split('_')[0]
+        if label == '_background_noise_':
+            label = 'silence'
+        if label not in LABELS:
+            label = 'unknown'
+
+        label_id = NAME2ID[label]
+
+        sample = (label_id, uid, fname)
+        sample_id = splits[-2] + splits[-1]
+        if sample_id in val_files:
+            val.append(sample)
+        elif sample_id in train_files:
+            train.append(sample)
+    print('There are {} train and {} val samples'.format(len(train), len(val)))
+
+    return train, val
+
 # https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
 def load_train_val_data():
     """ Return 2 lists of tuples:
     [(class_id, user_id, path), ...] for train
     [(class_id, user_id, path), ...] for validation
     """
-    # Just a simple regexp for paths with three groups:
-    # prefix, label, user_id
-    pattern = re.compile("C://(.+/)?(\w+)/([^_]+)_.+wav")
     all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
 
     with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
@@ -121,133 +140,17 @@ def load_train_val_data():
     print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
     return train, val, None
 
-
-def load_train_val_data_new():
-    """ Return 2 lists of tuples:
-    [(class_id, user_id, path), ...] for train
-    [(class_id, user_id, path), ...] for validation
-    """
-    pattern = re.compile("C://(.+\\)?(\w+)\\([^_]+)_.+wav")
-    all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
-
-    speakers = []
-    for fname in all_files:
-        splits = fname.split('\\')
-        if splits[-2] != '_background_noise_':
-            speakers.append(splits[-1].split('_')[0])
-    speakers = np.unique(speakers)
-    train_speakers, val_speakers = train_test_split(speakers, test_size=0.2, random_state=RS)
-    val_speakers, test_speakers = train_test_split(val_speakers, test_size=0.5, random_state=RS)
-    
-    train, val, test = [], [], []
-    noise = []
-    for fname in all_files:
-        splits = fname.split('\\')
-        label, uid = splits[-2], splits[-1].split('_')[0]
-        if label == '_background_noise_':
-            label = 'silence'
-        if label not in LABELS:
-            label = 'unknown'
-
-        label_id = NAME2ID[label]
-
-        sample = (label_id, uid, fname)
-        if uid in val_speakers:
-            val.append(sample)
-        elif uid in test_speakers:
-            test.append(sample)
-        elif label == 'silence':
-            noise.append(sample)
-        else:
-            train.append(sample)
-
-    print('There are {} train, {} val, {} test samples'.format(len(train), len(val), len(test)))
-
-    val = balance_unknown(val)
-    test = balance_unknown(test)
-    
-    noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / len(noise)
-    n_noise_type_train = int(noise_type_percent * len(train))
-    n_noise_type_val = int(noise_type_percent * len(val))
-    n_noise_type_test = int(noise_type_percent * len(test))
-
-    for sample in noise:
-        for i in range(n_noise_type_train):
-            train.append(sample)
-        for i in range(n_noise_type_val):
-            val.append(sample)
-        for i in range(n_noise_type_test):
-            test.append(sample)
-
-    print('There are {} train, {} val, {} test samples after adding SILENCE'.format(len(train), len(val), len(test)))
-    train_labels = np.array([s[0] for s in train])
-    val_labels = np.array([s[0] for s in val])
-    test_labels = np.array([s[0] for s in val])
-    train_parts = [len(train_labels[train_labels == l]) / len(train_labels) for l in range(len(LABELS))]
-    val_parts = [len(val_labels[val_labels == l]) / len(val_labels) for l in range(len(LABELS))]
-    test_parts = [len(test_labels[test_labels == l]) / len(test_labels) for l in range(len(LABELS))]
-    print('TRAIN: ', train_parts)
-    print('VAL: ', val_parts)
-    print('HO: ', test_parts)
-    
-    return train, val, test
-
-# https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
-# def load_train_val_data():
-#     """ Return 2 lists of tuples:
-#     [(class_id, user_id, path), ...] for train
-#     [(class_id, user_id, path), ...] for validation
-#     """
-#     # Just a simple regexp for paths with three groups:
-#     # prefix, label, user_id
-#     pattern = re.compile("C://(.+\\)?(\w+)\\([^_]+)_.+wav")
-#     all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
-
-#     with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
-#         validation_files = fin.readlines()
-#     valset = set()
-#     for fname in validation_files:
-#         splits = fname.split('\\')
-#         valset.add(splits[-1].rstrip())
-
-#     print(valset)
-#     print(len(valset))
-#     train, val = [], []
-#     noise = [(NAME2ID['silence'], '', '')]
-#     for fname in all_files:
-#         splits = fname.split('\\')
-#         label, uid = splits[-2], splits[-1]
-#         if label == '_background_noise_':
-#             label = 'silence'
-#         if label not in LABELS:
-#             label = 'unknown'
-
-#         label_id = NAME2ID[label]
-
-#         sample = (label_id, uid, fname)
-#         # print (uid)
-#         if label + '/' + uid in valset:
-#             print(label + '/' + uid)
-#             val.append(sample)
-#         elif label == 'silence':
-#             noise.append(sample)
-#         else:
-#             train.append(sample)
-
-#     print('There are {} train and {} val samples'.format(len(train), len(val)))
-
-#     noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
-#     n_noise_type_train = int(noise_type_percent * len(train))
-#     n_noise_type_val = int(noise_type_percent * len(val))
-
-#     for sample in noise:
-#         for i in range(n_noise_type_train):
-#             train.append(sample)
-#         for i in range(n_noise_type_val):
-#             val.append(sample)
-
-#     print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
-#     return train, val, None
+def dump_preds(preds, preds_file, fnames=None):
+    if not os.path.exists(PREDS_DIR):
+        os.makedirs(PREDS_DIR)
+    if fnames is None:
+        pd.DataFrame(preds).to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index=False, header=False)
+    else:
+        df = pd.DataFrame(preds, index=fnames)
+        # print(df.shape, preds.shape)
+        # for i, l in enumerate(LABELS):
+            # df[l] = preds[i]
+        df.to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index_label='fname', header=LABELS)
 
 def prepare_settings(args, resize=None):
     settings = dict()
@@ -343,7 +246,7 @@ class AudioTransformer:
         elif len(wav) < LENGTH:
             wav = self.pad_audio(wav)
 
-        if mode == 'train' and fname != '':
+        if mode == 'train' and fname != '' and label_id != NAME2ID['silence']:
             wav = self.apply_augmentation(wav, label_id)
 
         if self.spect == 'scipy':
@@ -353,6 +256,7 @@ class AudioTransformer:
             spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=129, hop_length=130, n_fft=480)
             spect = librosa.logamplitude(spect)
         else:
+            # don't use it
             spect = librosa.feature.melspectrogram(wav, sr=LENGTH, n_mels=40, hop_length=160, n_fft=480)
             spect = librosa.logamplitude(spect)
 

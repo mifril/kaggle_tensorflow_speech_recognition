@@ -1,7 +1,7 @@
 import numpy as np
 
 from utilities import *
-from tensorflow.python.keras.utils import to_categorical
+from keras.utils import to_categorical
 
 def data_generator(data, batch_size, audio_transformer, mode='train'):
     if mode == 'train':
@@ -31,7 +31,7 @@ def data_generator(data, batch_size, audio_transformer, mode='train'):
         y_batch = to_categorical(y_batch, num_classes = len(LABELS))
         yield x_batch, y_batch
 
-def data_generator2(data, batch_size, audio_transformer, mode='train'):
+def data_generator_ram(data, batch_size, audio_transformer, mode='train'):
     if mode == 'train':
         np.random.shuffle(data)
     X = []
