@@ -49,8 +49,7 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
             patience=patience,
             verbose=1,
             epsilon=1e-6,
-            mode='min'),
-
+            mode='min')
         ]
 
     settings = prepare_settings(args)
@@ -67,12 +66,25 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
             n_val = len(valset)
             print(n_train, n_val)
             fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
-            callbacks += [
+            
+            callbacks = [
+                EarlyStopping(monitor='val_loss',
+                    patience=patience * 2,
+                    verbose=1,
+                    min_delta=1e-6,
+                    mode='min'),
+                ReduceLROnPlateau(monitor='val_loss',
+                    factor=reduce_rate,
+                    patience=patience,
+                    verbose=1,
+                    epsilon=1e-6,
+                    mode='min'),
                 ModelCheckpoint(monitor='val_loss',
                     filepath=fold_wdir + '{val_loss:.6f}-{val_acc:.6f}-{epoch:03d}.h5',
                     save_best_only=True,
                     save_weights_only=True,
-                    mode='min')
+                    mode='min'),
+                TensorBoard(log_dir=fold_wdir + 'logs')
                 ]
             model.fit_generator(generator=data_generator(trainset, batch_size, audio_transformer, mode='train'),
                 steps_per_epoch=int(np.ceil(n_train / float(batch_size))),
@@ -98,7 +110,8 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
                 filepath=wdir + '/{val_loss:.6f}-{val_acc:.6f}-{epoch:03d}.h5',
                 save_best_only=True,
                 save_weights_only=True,
-                mode='min')
+                mode='min'),
+                TensorBoard(log_dir=wdir + 'logs')
             ]
 
         if hoset is not None:
