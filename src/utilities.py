@@ -61,7 +61,7 @@ def balance_unknown(data):
     parts = [len(labels[labels == l]) / len(labels) for l in range(len(LABELS))]
     return data
 
-def load_fold(fold):
+def load_fold(fold, no_unk=False):
     train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
     val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
     
@@ -81,6 +81,8 @@ def load_fold(fold):
         sample = (label_id, uid, fname)
         sample_id = splits[-2] + splits[-1]
         if sample_id in val_files:
+            if no_unk and label == 'unknown':
+                continue
             val.append(sample)
         elif sample_id in train_files:
             train.append(sample)
@@ -140,17 +142,70 @@ def load_train_val_data():
     print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
     return train, val, None
 
-def dump_preds(preds, preds_file, fnames=None):
-    if not os.path.exists(PREDS_DIR):
-        os.makedirs(PREDS_DIR)
+def load_train_val_data_with_unknown():
+    """ Return 2 lists of tuples:
+    [(class_id, user_id, path), ...] for train
+    [(class_id, user_id, path), ...] for validation
+    """
+    all_files = glob.glob(os.path.join(TRAIN_AUDIO_DIR, '*/*wav'))
+
+    with open(os.path.join(TRAIN_DIR, 'validation_list.txt'), 'r') as fin:
+        validation_files = fin.readlines()
+    valset = set()
+    for fname in validation_files:
+        splits = fname.split('/')
+        valset.add(splits[-1].split('_')[0].rstrip())
+    print(valset)
+    train, val = [], []
+    noise = [(NAME2ID['silence'], '', '')]
+    for fname in all_files:
+        splits = fname.split('\\')
+        label, uid = splits[-2], splits[-1].split('_')[0]
+        if label == '_background_noise_':
+            label = 'silence'
+        if label not in LABELS:
+            label = 'unknown'
+
+        label_id = NAME2ID[label]
+
+        sample = (label_id, uid, fname)
+        # print (uid)
+        if uid in valset:
+            val.append(sample)
+        elif label == 'silence':
+            noise.append(sample)
+        else:
+            train.append(sample)
+
+    print('There are {} train and {} val samples'.format(len(train), len(val)))
+
+    noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
+    n_noise_type_train = int(noise_type_percent * len(train))
+    n_noise_type_val = int(noise_type_percent * len(val))
+
+    for sample in noise:
+        for i in range(n_noise_type_train):
+            train.append(sample)
+        for i in range(n_noise_type_val):
+            val.append(sample)
+
+    print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
+    return train, val, None
+
+
+def dump_preds(preds, preds_file, fnames=None, dump_dir=None):
+    if dump_dir is None:
+        dump_dir = PREDS_DIR
+    if not os.path.exists(dump_dir):
+        os.makedirs(dump_dir)
     if fnames is None:
-        pd.DataFrame(preds).to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index=False, header=False)
+        pd.DataFrame(preds).to_csv(os.path.join(dump_dir, preds_file + '.csv'), index=False, header=False)
     else:
         df = pd.DataFrame(preds, index=fnames)
         # print(df.shape, preds.shape)
         # for i, l in enumerate(LABELS):
             # df[l] = preds[i]
-        df.to_csv(os.path.join(PREDS_DIR, preds_file + '.csv'), index_label='fname', header=LABELS)
+        df.to_csv(os.path.join(dump_dir, preds_file + '.csv'), index_label='fname', header=LABELS)
 
 def prepare_settings(args, resize=None):
     settings = dict()
