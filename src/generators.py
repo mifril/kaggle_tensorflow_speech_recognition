@@ -71,7 +71,6 @@ def data_generator_ram(data, batch_size, audio_transformer, mode='train'):
 def test_generator(files, batch_size, audio_transformer, tta=1):
     if tta < batch_size:
         for start in range(0, len(files), int(batch_size / tta)):
-            print(start)
             x_batch = []
             end = min(start + int(batch_size / tta), len(files))
             batch_files = files[start:end]
