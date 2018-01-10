@@ -15,7 +15,7 @@ import gc
 
 from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
 from tensorflow.python.ops.metrics import mean_per_class_accuracy
-
+# python predict.py --model resnet50 --batch 16 --wdir r50_199_f -rf --out_file r50_199_f --preds_file r50_199_f -vt
 
 def predict_val(args, batch_size=32, wdir=None, tta=1):
     if args.folds:
@@ -143,7 +143,7 @@ def predict(args, batch_size=32, wdir=None, tta=1):
             dump_preds(preds, 'test', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=[f.split('\\')[-1] for f in files])
         
         mean_preds = np.mean(preds_folds, axis=0)
-        mean_labels = np.argmax(preds, axis=1)
+        mean_labels = np.argmax(mean_preds, axis=1)
         dump_preds(mean_preds, args.preds_file, fnames=[f.split('\\')[-1] for f in files])
         make_submission(files, mean_labels, args.out_file)
     else:
