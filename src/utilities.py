@@ -25,6 +25,7 @@ BG_DIR = TRAIN_DIR + 'audio/_background_noise_/'
 TEST_DIR = MAIN_DIR + 'test/audio/'
 PREDS_DIR = '../output/preds/'
 KFOLD_FILENAME = 'kfold_cache_4.pklz'
+MY_KFOLD_FILENAME = 'kfold4_max.pklz'
 
 LABELS = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'silence', 'unknown']
 ID2NAME = {i: name for i, name in enumerate(LABELS)}

@@ -17,7 +17,12 @@ import gc
 
 def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_rate=0.5, wdir=None):   
     if args.folds:
-        folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
+        if args.fold_type == 'my':
+            print('Loading my kfold ...')
+            folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
+        else:
+            print('Loading mutual kfold ...')
+            folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
     else:
         if args.loader == 'new':
             trainset, valset, hoset = load_train_val_data_new()
@@ -57,7 +62,7 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
 
     if args.folds:
         for i in range(args.start_fold, len(folds)):
-            trainset, valset = load_fold(folds[i])
+            trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
             print('Train on fold ', i)
             opt = OPTS[args.opt](args.start_lr)
             model = get_model(model_f, shape, opt)
@@ -141,7 +146,10 @@ if __name__ == '__main__':
     parser.add_argument("--spect", type=str, default="scipy", help="spectrogram type")
 
     parser.add_argument("-f", "--folds", action="store_true", help="folds if True")
+    parser.add_argument("--fold_type", type=str, default="our", help="fold type: mutual / my")
     parser.add_argument("--start_fold", type=int, default=0, help="start fold")
+
+    parser.add_argument("-u", "--no_unk", action="store_true", help="no UNKNOWN in val if True")
 
     parser.add_argument("--win_size", type=int, default=256, help="stft window size")
     parser.add_argument("--win_stride", type=int, default=128, help="stft window stride")
