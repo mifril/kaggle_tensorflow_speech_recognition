@@ -127,7 +127,7 @@ def load_fold_my_noise(fold, no_unk=False):
         print(fname)
         label = 'silence'
         label_id = NAME2ID[label]
-        sample = (label_id, '', fname)
+        sample = (label_id, '', os.path.join(BG_DIR, fname))
         noise.append(sample)
 
     noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
