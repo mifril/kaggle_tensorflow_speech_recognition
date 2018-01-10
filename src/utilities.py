@@ -91,6 +91,60 @@ def load_fold(fold, no_unk=False):
 
     return train, val
 
+def load_fold_my_noise(fold, no_unk=False):
+    train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
+    val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
+    
+    all_files = glob.glob(os.path.join(TRAIN_MODIFIED_AUDIO_DIR, '*/*wav'))
+
+    train, val = [], []
+    for fname in all_files:
+        splits = fname.split('\\')
+        label, uid = splits[-2], splits[-1].split('_')[0]
+        if label == '_background_noise_':
+            continue
+        if label not in LABELS:
+            label = 'unknown'
+
+        label_id = NAME2ID[label]
+
+        sample = (label_id, uid, fname)
+        sample_id = splits[-2] + splits[-1]
+        if sample_id in val_files:
+            if no_unk and label == 'unknown':
+                continue
+            val.append(sample)
+        elif sample_id in train_files:
+            train.append(sample)
+    print('There are {} train and {} val samples'.format(len(train), len(val)))
+
+    bg_files = os.listdir(BG_DIR)
+    bg_files.remove('README.md')
+    
+    noise = [(NAME2ID['silence'], '', '')]
+    print('Noise files:')
+    for fname in bg_files:
+        print(fname)
+        label = 'silence'
+        label_id = NAME2ID[label]
+        sample = (label_id, '', fname)
+        noise.append(sample)
+
+    noise_type_percent = (SILENCE_PERCENT / (1 - SILENCE_PERCENT)) / (len(noise) + 1)
+    n_noise_type_train = int(noise_type_percent * len(train))
+    n_noise_type_val = int(noise_type_percent * len(val))
+
+    for sample in noise:
+        for i in range(n_noise_type_train):
+            train.append(sample)
+        for i in range(n_noise_type_val):
+            val.append(sample)
+
+    print('There are {} train and {} val samples after adding SILENCE'.format(len(train), len(val)))
+
+    return train, val
+
+
 # https://www.kaggle.com/alexozerin/end-to-end-baseline-tf-estimator-lb-0-72
 def load_train_val_data():
     """ Return 2 lists of tuples:

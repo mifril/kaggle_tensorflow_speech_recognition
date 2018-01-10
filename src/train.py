@@ -62,7 +62,10 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
 
     if args.folds:
         for i in range(args.start_fold, len(folds)):
-            trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
+            if args.my_noise:
+                trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk)
+            else:
+                trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
             print('Train on fold ', i)
             opt = OPTS[args.opt](args.start_lr)
             model = get_model(model_f, shape, opt)
@@ -150,6 +153,7 @@ if __name__ == '__main__':
     parser.add_argument("--start_fold", type=int, default=0, help="start fold")
 
     parser.add_argument("-u", "--no_unk", action="store_true", help="no UNKNOWN in val if True")
+    parser.add_argument("--my_noise", action="store_true", help="use my noise, ignore other")
 
     parser.add_argument("--win_size", type=int, default=256, help="stft window size")
     parser.add_argument("--win_stride", type=int, default=128, help="stft window stride")
