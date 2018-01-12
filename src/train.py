@@ -19,7 +19,11 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
     if args.folds:
         if args.fold_type == 'my':
             print('Loading my kfold ...')
-            folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
+            if args.my_noise:
+                print('Loading my kfold with my noise...')
+                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
+            else:
+                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
         else:
             print('Loading mutual kfold ...')
             folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
@@ -62,10 +66,11 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
 
     if args.folds:
         for i in range(args.start_fold, len(folds)):
-            if args.my_noise:
-                trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk)
-            else:
-                trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
+            # if args.my_noise:
+            #     trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk)
+            # else:
+            #     trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
+            trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
             print('Train on fold ', i)
             opt = OPTS[args.opt](args.start_lr)
             model = get_model(model_f, shape, opt)

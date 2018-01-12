@@ -22,6 +22,7 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
         if args.fold_type == 'my':
             print('Loading my kfold ...')
             if args.my_noise:
+                print('Loading my kfold with my noise...')
                 folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
             else:
                 folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))

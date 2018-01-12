@@ -75,6 +75,8 @@ def balance_unknown(data):
 def load_fold(fold, no_unk=False):
     train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
     val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
+
+    print('Files in folds: ', len(train_files), len(val_files))
     
     all_files = glob.glob(os.path.join(TRAIN_MODIFIED_AUDIO_DIR, '*/*wav'))
 
@@ -275,9 +277,6 @@ def dump_preds(preds, preds_file, fnames=None, dump_dir=None):
         pd.DataFrame(preds).to_csv(os.path.join(dump_dir, preds_file + '.csv'), index=False, header=False)
     else:
         df = pd.DataFrame(preds, index=fnames)
-        # print(df.shape, preds.shape)
-        # for i, l in enumerate(LABELS):
-            # df[l] = preds[i]
         df.to_csv(os.path.join(dump_dir, preds_file + '.csv'), index_label='fname', header=LABELS)
 
 def prepare_settings(args, resize=None):
