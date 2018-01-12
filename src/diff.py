@@ -30,6 +30,7 @@ def diff_probs_to_labels(f_new, f_best='best', f_old=None):
     if f_old is not None:
         f_old = OUTPUT_DIR + f_old + '.csv'
     
+    print(f_new)
     p_new = pd.read_csv(f_new, index_col='fname').values
     p_new = np.argmax(p_new, axis=1)
     p_new = [ID2NAME[i] for i in p_new]
