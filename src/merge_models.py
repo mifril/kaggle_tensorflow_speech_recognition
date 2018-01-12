@@ -14,7 +14,7 @@ import gc
 from sklearn.metrics import log_loss, accuracy_score
 
 def mean(files, out_file, weights=None, p_rate=0.0):
-    preds = np.array([pd.read_csv(os.path.join(PREDS_DIR, f + '.csv'), header=None).values for f in files])
+    preds = np.array([pd.read_csv(os.path.join(PREDS_DIR, f + '.csv'), index_col='fname').values for f in files])
     print(preds[0].shape)
     # print(preds[0, 2:3])
     # print(preds[1, 2:3])
@@ -155,6 +155,8 @@ if __name__ == '__main__':
     else:
         weights = None
     
-    pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
-              'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa']
+    # pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
+    #           'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa']
+    pred_files = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'xcep_my_my_n_kbest']
+    weights = [2, 2, 1, 1]
     mean(pred_files, args.out_file, weights, args.p_rate)

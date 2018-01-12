@@ -14,9 +14,15 @@ import tensorflow as tf
 from keras import backend as K
 import random as rn
 
+from sys import platform
+
+if platform == "linux" or platform == "linux2":
+    MAIN_DIR = '../../'
+elif platform == "win32":
+    MAIN_DIR = 'C:/data/tf_speech/'
+
 INPUT_DIR = '../input/'
 OUTPUT_DIR = '../output/'
-MAIN_DIR = 'C:/data/tf_speech/'
 TRAIN_DIR = MAIN_DIR + 'train/'
 TRAIN_MODIFIED_DIR = MAIN_DIR + 'train_modified/'
 TRAIN_MODIFIED_AUDIO_DIR = TRAIN_MODIFIED_DIR + 'audio/'
@@ -24,8 +30,12 @@ TRAIN_AUDIO_DIR = TRAIN_DIR + 'audio/'
 BG_DIR = TRAIN_DIR + 'audio/_background_noise_/'
 TEST_DIR = MAIN_DIR + 'test/audio/'
 PREDS_DIR = '../output/preds/'
+
 KFOLD_FILENAME = 'kfold_cache_4.pklz'
 MY_KFOLD_FILENAME = 'kfold4_max.pklz'
+MY_KFOLD_NOISE_FILENAME = 'kfold4_max_new_noise.pklz'
+
+N_FOLDS = 4
 
 LABELS = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'silence', 'unknown']
 ID2NAME = {i: name for i, name in enumerate(LABELS)}
@@ -70,7 +80,10 @@ def load_fold(fold, no_unk=False):
 
     train, val = [], []
     for fname in all_files:
-        splits = fname.split('\\')
+        if platform == "linux" or platform == "linux2":
+            splits = fname.split('/')
+        elif platform == "win32":
+            splits = fname.split('\\')
         label, uid = splits[-2], splits[-1].split('_')[0]
         if label == '_background_noise_':
             label = 'silence'
@@ -99,7 +112,11 @@ def load_fold_my_noise(fold, no_unk=False):
 
     train, val = [], []
     for fname in all_files:
-        splits = fname.split('\\')
+        if platform == "linux" or platform == "linux2":
+            splits = fname.split('/')
+        elif platform == "win32":
+            splits = fname.split('\\')
+
         label, uid = splits[-2], splits[-1].split('_')[0]
         if label == '_background_noise_':
             continue
@@ -121,7 +138,8 @@ def load_fold_my_noise(fold, no_unk=False):
     bg_files = os.listdir(BG_DIR)
     bg_files.remove('README.md')
     
-    noise = [(NAME2ID['silence'], '', '')]
+    # noise = [(NAME2ID['silence'], '', '')]
+    noise = []
     print('Noise files:')
     for fname in bg_files:
         print(fname)

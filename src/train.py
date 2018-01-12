@@ -149,7 +149,7 @@ if __name__ == '__main__':
     parser.add_argument("--spect", type=str, default="scipy", help="spectrogram type")
 
     parser.add_argument("-f", "--folds", action="store_true", help="folds if True")
-    parser.add_argument("--fold_type", type=str, default="our", help="fold type: mutual / my")
+    parser.add_argument("--fold_type", type=str, default="mutual", help="fold type: mutual / my")
     parser.add_argument("--start_fold", type=int, default=0, help="start fold")
 
     parser.add_argument("-u", "--no_unk", action="store_true", help="no UNKNOWN in val if True")

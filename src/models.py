@@ -27,6 +27,22 @@ def load_best_weights_min(model, model_name, wdir=None, fold=None):
         print('loaded weights file: ', wf)
     return wdir
 
+def load_k_best_weights_min(model, model_name, k=0, wdir=None, fold=None):
+    if wdir is None:
+        wdir = str(model_name) + '/'
+    if fold is not None:
+        wdir += '/fold{}/'.format(fold)
+
+    print('looking for weights in {}'.format(wdir))
+    if not os.path.exists(wdir):
+        os.makedirs(wdir)
+    elif len(os.listdir(wdir)) > 0:
+        print(os.listdir(wdir))
+        wf = sorted(glob.glob(os.path.join(wdir, '*.h5')))[k]
+        model.load_weights(wf)
+        print('loaded weights file: ', wf)
+    return wdir
+
 def top_and_dense(top_model_f, shape, opt, dropout_val=0.5):
     top_model = top_model_f(include_top=False, weights=None, input_shape=shape)
     x = top_model.output

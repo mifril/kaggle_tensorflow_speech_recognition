@@ -21,7 +21,10 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
     if args.folds:
         if args.fold_type == 'my':
             print('Loading my kfold ...')
-            folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
+            if args.my_noise:
+                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
+            else:
+                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
         else:
             print('Loading mutual kfold ...')
             folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
@@ -50,10 +53,7 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
         folds_class_acc = []
         folds_class_total = []
         for i in range(args.start_fold, len(folds)):
-            if args.my_noise:
-                trainset, valset = load_fold_my_noise(folds[i])
-            else:
-                trainset, valset = load_fold(folds[i])
+            trainset, valset = load_fold(folds[i])
 
             model = get_model(model_f, shape)
             fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
@@ -86,7 +86,9 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
             folds_class_total.append(class_total)
             folds_acc.append(accuracy_score(labels, val_p_labels))
             folds_mpc_acc.append(np.mean(class_acc))
-            dump_preds(val_preds, 'train', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=[f.split('\\')[-2] + '_' + f.split('\\')[-1] for f in valfiles])
+
+            fnames = [f.split('\\')[-2] + '_' + f.split('\\')[-1] if len(f.split('\\')) > 2 else f.split('/')[-2] + '_' + f.split('/')[-1] for f in valfiles]
+            dump_preds(val_preds, 'train', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=fnames)
         
         folds_class_acc = np.mean(folds_class_acc, axis=0)
         folds_class_total = np.sum(folds_class_total, axis=0)
@@ -95,6 +97,7 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
             acc = folds_class_acc[NAME2ID[l]]
             class_acc.append(acc)
             print('{}, total: {}, accuracy: {}'.format(l, total,  acc))
+
         print('MEAN acc = {}, mpc acc = {}'.format(np.mean(folds_acc), np.mean(folds_mpc_acc)))
 
     else:
@@ -139,9 +142,8 @@ def predict(args, batch_size=32, wdir=None, tta=1):
     audio_transformer = AudioTransformer(settings)
 
     if args.folds:
-        folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
         preds_folds = []
-        for i in range(args.start_fold, len(folds)):
+        for i in range(args.start_fold, N_FOLDS):
             model = get_model(model_f, shape)
             fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
 
@@ -194,7 +196,7 @@ if __name__ == '__main__':
     parser.add_argument("--spect", type=str, default="scipy", help="spectrogram type")
 
     parser.add_argument("-f", "--folds", action="store_true", help="folds if True")
-    parser.add_argument("--fold_type", type=str, default="our", help="fold type: mutual / my")
+    parser.add_argument("--fold_type", type=str, default="mutual", help="fold type: mutual / my")
     parser.add_argument("--start_fold", type=int, default=0, help="start fold")
 
     parser.add_argument("--my_noise", action="store_true", help="use my noise, ignore other")
