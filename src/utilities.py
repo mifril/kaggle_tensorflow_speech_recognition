@@ -112,12 +112,12 @@ def load_fold(fold, no_unk=False, pl_fold=None):
         for fname in pl_fold[0]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample(label_id, uid, fname)
+            sample = (label_id, uid, fname)
             train.append(sample)
         for fname in pl_fold[1]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample(label_id, uid, fname)
+            sample = (label_id, uid, fname)
             val.append(sample)
 
     print('There are {} train and {} val samples'.format(len(train), len(val)))
@@ -160,12 +160,12 @@ def load_fold_my_noise(fold, no_unk=False, pl_fold=None):
         for fname in pl_fold[0]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample(label_id, uid, fname)
+            sample = (label_id, uid, fname)
             train.append(sample)
         for fname in pl_fold[1]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample(label_id, uid, fname)
+            sample = (label_id, uid, fname)
             val.append(sample)
 
     bg_files = os.listdir(BG_DIR)

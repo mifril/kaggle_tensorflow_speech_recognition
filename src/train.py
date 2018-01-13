@@ -23,6 +23,7 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
                 print('Loading my kfold with my noise...')
                 folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
                 if args.pl:
+                    print('Loading PL kfold...')
                     pl_folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_PL_FILENAME, 'rb'))
                 else:
                     pl_folds = None
