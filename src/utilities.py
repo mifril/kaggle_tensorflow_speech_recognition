@@ -35,6 +35,9 @@ KFOLD_FILENAME = 'kfold_cache_4.pklz'
 MY_KFOLD_FILENAME = 'kfold4_max.pklz'
 MY_KFOLD_NOISE_FILENAME = 'kfold4_max_new_noise.pklz'
 
+MY_KFOLD_PL_FILENAME = 'kfold4_max_pseudo_label.pklz'
+PL_DF = INPUT_DIR + 'pseudo_label.csv'
+
 N_FOLDS = 4
 
 LABELS = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go', 'silence', 'unknown']
@@ -72,7 +75,7 @@ def balance_unknown(data):
     parts = [len(labels[labels == l]) / len(labels) for l in range(len(LABELS))]
     return data
 
-def load_fold(fold, no_unk=False):
+def load_fold(fold, no_unk=False, pl_fold=None):
     train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
     val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
 
@@ -86,6 +89,7 @@ def load_fold(fold, no_unk=False):
             splits = fname.split('/')
         elif platform == "win32":
             splits = fname.split('\\')
+
         label, uid = splits[-2], splits[-1].split('_')[0]
         if label == '_background_noise_':
             label = 'silence'
@@ -102,11 +106,25 @@ def load_fold(fold, no_unk=False):
             val.append(sample)
         elif sample_id in train_files:
             train.append(sample)
+
+    if pl_fold is not None:
+        df_pl = pd.read_csv(PL_DF, index_col='fname')
+        for fname in pl_fold[0]:
+            uid = fname.split('/')[-1]
+            label_id = NAME2ID[df_pl.loc[uid].label]
+            sample(label_id, uid, fname)
+            train.append(sample)
+        for fname in pl_fold[1]:
+            uid = fname.split('/')[-1]
+            label_id = NAME2ID[df_pl.loc[uid].label]
+            sample(label_id, uid, fname)
+            val.append(sample)
+
     print('There are {} train and {} val samples'.format(len(train), len(val)))
 
     return train, val
 
-def load_fold_my_noise(fold, no_unk=False):
+def load_fold_my_noise(fold, no_unk=False, pl_fold=None):
     train_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[0]]
     val_files = [f.split('\\')[-2] + f.split('\\')[-1] for f in fold[1]]
     
@@ -136,6 +154,19 @@ def load_fold_my_noise(fold, no_unk=False):
         elif sample_id in train_files:
             train.append(sample)
     print('There are {} train and {} val samples'.format(len(train), len(val)))
+
+    if pl_fold is not None:
+        df_pl = pd.read_csv(PL_DF, index_col='fname')
+        for fname in pl_fold[0]:
+            uid = fname.split('/')[-1]
+            label_id = NAME2ID[df_pl.loc[uid].label]
+            sample(label_id, uid, fname)
+            train.append(sample)
+        for fname in pl_fold[1]:
+            uid = fname.split('/')[-1]
+            label_id = NAME2ID[df_pl.loc[uid].label]
+            sample(label_id, uid, fname)
+            val.append(sample)
 
     bg_files = os.listdir(BG_DIR)
     bg_files.remove('README.md')
@@ -290,6 +321,8 @@ def prepare_settings(args, resize=None):
     settings['time_shift_p'] = args.time_shift_p
     settings['speed_tune_p'] = args.speed_tune_p
     settings['mix_with_bg_p'] = args.mix_with_bg_p
+
+    settings['pl'] = args.pl
     return settings
 
 class AudioTransformer:
@@ -303,6 +336,8 @@ class AudioTransformer:
         self.mix_with_bg_p = settings['mix_with_bg_p']
         self.spect = settings['spect']
         self.bg_noises = self.load_bg_noises()
+
+        self.pl = settings['pl']
 
     def load_bg_noises(self):
         bg_files = os.listdir(BG_DIR)

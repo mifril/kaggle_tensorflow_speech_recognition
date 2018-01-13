@@ -24,7 +24,12 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
             if args.my_noise:
                 print('Loading my kfold with my noise...')
                 folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
+                if args.pl:
+                    pl_folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_PL_FILENAME, 'rb'))
+                else:
+                    pl_folds = None
             else:
+                print('Loading my kfold andd mutual noise...')
                 folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
         else:
             print('Loading mutual kfold ...')
@@ -54,7 +59,7 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
         folds_class_acc = []
         folds_class_total = []
         for i in range(args.start_fold, len(folds)):
-            trainset, valset = load_fold(folds[i])
+            trainset, valset = load_fold(folds[i], pl_fold=pl_folds[i])
 
             model = get_model(model_f, shape)
             fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
@@ -204,6 +209,8 @@ if __name__ == '__main__':
 
     parser.add_argument("-v", "--val", action="store_true", help="predict on val")
     parser.add_argument("-t", "--test", action="store_true", help="predict on test")
+
+    parser.add_argument("--pl", action="store_true", help="use KFold with pseudo labels")
 
     parser.add_argument('--win_size', type=int, default=256, help='stft window size')
     parser.add_argument('--win_stride', type=int, default=128, help='stft window stride')
