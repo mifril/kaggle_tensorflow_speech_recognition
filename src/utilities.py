@@ -107,18 +107,20 @@ def load_fold(fold, no_unk=False, pl_fold=None):
         elif sample_id in train_files:
             train.append(sample)
 
+    
     if pl_fold is not None:
         df_pl = pd.read_csv(PL_DF, index_col='fname')
         for fname in pl_fold[0]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample = (label_id, uid, fname)
+            sample = (label_id, uid, os.path.join(TEST_DIR, uid))
             train.append(sample)
         for fname in pl_fold[1]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample = (label_id, uid, fname)
+            sample = (label_id, uid, os.path.join(TEST_DIR, uid))
             val.append(sample)
+        print('There are {} train and {} val samples after PL'.format(len(train), len(val)))
 
     print('There are {} train and {} val samples'.format(len(train), len(val)))
 
@@ -160,13 +162,34 @@ def load_fold_my_noise(fold, no_unk=False, pl_fold=None):
         for fname in pl_fold[0]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample = (label_id, uid, fname)
+            sample = (label_id, uid, os.path.join(TEST_DIR, uid))
             train.append(sample)
         for fname in pl_fold[1]:
             uid = fname.split('/')[-1]
             label_id = NAME2ID[df_pl.loc[uid].label]
-            sample = (label_id, uid, fname)
+            sample = (label_id, uid, os.path.join(TEST_DIR, uid))
             val.append(sample)
+
+    # if pl_fold is not None:
+    #     train_uids = [f.split('/')[-1] for f in pl_fold[0]]
+    #     val_uids = [f.split('/')[-1] for f in pl_fold[1]]
+
+    #     df_pl = pd.read_csv(PL_DF, index_col='fname')
+    #     all_files = glob.glob(os.path.join(TEST_DIR, '*wav'))
+    #     for fname in all_files:
+    #         if platform == "linux" or platform == "linux2":
+    #             uid = fname.split('/')[-1]
+    #         elif platform == "win32":
+    #             uid = fname.split('\\')[-1]
+    #         if uid in train_uids:
+    #             label_id = NAME2ID[df_pl.loc[uid].label]
+    #             sample = (label_id, uid, fname)
+    #             train.append(sample)
+    #         elif uid in val_uids:
+    #             label_id = NAME2ID[df_pl.loc[uid].label]
+    #             sample = (label_id, uid, fname)
+    #             val.append(sample)
+        print('There are {} train and {} val samples after PL'.format(len(train), len(val)))
 
     bg_files = os.listdir(BG_DIR)
     bg_files.remove('README.md')
