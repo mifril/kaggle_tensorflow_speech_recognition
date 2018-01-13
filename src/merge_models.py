@@ -42,6 +42,33 @@ def mean(files, out_file, weights=None, p_rate=0.0):
         for fname, label in zip(files, pred_classes):
             fout.write('{},{}\n'.format(fname, ID2NAME[label]))
 
+def mean_old_and_new(files_old, files_new, out_file, weights=None, p_rate=0.0):
+    preds = np.array([pd.read_csv(os.path.join(PREDS_DIR, f + '.csv'), index_col='fname').values for f in files_new] + [pd.read_csv(os.path.join(PREDS_DIR, f + '.csv'), header=None).values for f in files_old])
+    print(preds[0].shape)
+    if weights is None:
+        preds = np.mean(preds, axis=0)
+    else:
+        preds = np.average(preds, weights=weights, axis=0)
+
+    files = glob.glob(os.path.join(TEST_DIR, '*.wav'))
+    files = [f.split('\\')[-1] for f in files]
+    pred_classes = np.argmax(preds, axis=1)
+
+    if p_rate > 0.0:
+        for l in range(len(LABELS) - 1):
+            cond = np.logical_and(pred_classes == 11, preds[:,l] > p_rate)
+            preds[np.where(cond)[0], 11] = 0.0
+        pred_classes = np.argmax(preds, axis=1)
+        # for l in range(len(LABELS) - 1):
+        #     classes[np.logical_and(classes == 11, preds[:,l] > p_rate)] = l
+
+    dump_preds(preds, 'mean_' + out_file, files)
+
+    with open(os.path.join(OUTPUT_DIR, '{}.csv'.format(out_file)), 'w') as fout:
+        fout.write('fname,label\n')
+        for fname, label in zip(files, pred_classes):
+            fout.write('{},{}\n'.format(fname, ID2NAME[label]))
+
 def search_alpha_itr(preds_1, preds_2, y_val, test_on_acc=False):
     best_alpha = 0.0
     best_loss = 10.0
@@ -155,8 +182,17 @@ if __name__ == '__main__':
     else:
         weights = None
     
-    # pred_files = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
-    #           'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa']
-    pred_files = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'xcep_my_my_n_kbest']
-    weights = [2, 2, 1, 1]
-    mean(pred_files, args.out_file, weights, args.p_rate)
+    pred_files_old = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
+              'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa', 'vgg19']
+    mean_old_and_new(pred_files_old, [], args.out_file, weights, args.p_rate)
+
+    # pred_files_old = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
+    #           'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa', 'vgg19']
+    # pred_files_new = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'r50_199_my_my_n']
+    # weights = [1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 0.5,
+    #     1, 1, 1, 2]
+    # mean_old_and_new(pred_files_old, pred_files_new, args.out_file, weights, args.p_rate)
+
+
+    # pred_files = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'r50_199_my_my_n']
+    # mean(pred_files, args.out_file, weights, args.p_rate)
