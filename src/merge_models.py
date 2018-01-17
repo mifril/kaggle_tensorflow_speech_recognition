@@ -32,9 +32,7 @@ def mean(files, out_file, weights=None, p_rate=0.0):
             cond = np.logical_and(pred_classes == 11, preds[:,l] > p_rate)
             preds[np.where(cond)[0], 11] = 0.0
         pred_classes = np.argmax(preds, axis=1)
-        # for l in range(len(LABELS) - 1):
-        #     classes[np.logical_and(classes == 11, preds[:,l] > p_rate)] = l
-
+    
     dump_preds(preds, 'mean_' + out_file, files)
 
     with open(os.path.join(OUTPUT_DIR, '{}.csv'.format(out_file)), 'w') as fout:
@@ -182,17 +180,83 @@ if __name__ == '__main__':
     else:
         weights = None
     
-    pred_files_old = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
-              'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa', 'vgg19']
-    mean_old_and_new(pred_files_old, [], args.out_file, weights, args.p_rate)
-
     # pred_files_old = ['vgg16_480_160', 'vgg16_256_128', 'resnet50', 'resnet50_224', 'incres_140', 'incres_199',
     #           'xception', 'inception', 'resnet50_fixed', 'resnet50_librosa', 'vgg19']
-    # pred_files_new = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'r50_199_my_my_n']
-    # weights = [1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 0.5,
-    #     1, 1, 1, 2]
-    # mean_old_and_new(pred_files_old, pred_files_new, args.out_file, weights, args.p_rate)
+    # mean_old_and_new(pred_files_old, [], args.out_file, weights, args.p_rate)
 
 
-    # pred_files = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'r50_199_my_my_n']
+
+# 
+# [all] = mean(old, except vgg19 + new, except PL and ensembles)
+# 
+    pred_files_old = [
+                        # 'vgg16_480_160',
+                        # 'vgg16_256_128',
+                        # 'resnet50',
+                        # 'resnet50_224',
+                        # 'incres_140',
+                        # 'incres_199',
+                        # 'xception',
+                        # 'inception',
+                        # 'resnet50_fixed',
+                        # 'resnet50_librosa',
+                            # 'vgg19'
+                        ]
+
+    pred_files_new = [
+                        # 'vgg16_my_my_n',
+                        # 'inc_139_my_my_n',
+                        # 'xcep_my_my_n',
+                        # 'r50_199_my_my_n',
+                        # 'r50_224_my_my_n',
+                        # 'vgg19_my_my_n',
+                        # 'ir_139_my_my_n',
+                        # 'ir_199_my_my_n',
+
+                            'subm_ensemble_weights_raw_9',
+                            'mean_[all]'
+                        
+                        # 'inc_139_pl_pall',
+                        # 'ir_199_pl'
+                        ]
+    weights = [
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                # 1,
+                    # 1,
+        # 1,
+        # 1,
+        # 1,
+        # 1,
+        # 1,
+        # 1,
+        # 1,
+        # 1,
+            6,
+            1,
+        # 1,
+        # 1
+        ]
+
+    for f, w in zip(pred_files_old + pred_files_new, weights):
+        print('{}: {}'.format(f, w))
+    print()
+    mean_old_and_new(pred_files_old, pred_files_new, args.out_file, weights, args.p_rate)
+
+
+    # pred_files = ['vgg16_my_my_n', 'inc_139_my_my_n', 'xcep_my_my_n', 'r50_199_my_my_n',
+    #                 'r50_224_my_my_n', 'vgg19_my_my_n', 'ir_139_my_my_n',
+    #                 'inc_139_pl', 'ir_199_pl'
+    #                 ]
+    # weights = [ 1, 1, 1, 1,
+    #             1, 1, 1,
+    #             4, 4
+    #             ]
     # mean(pred_files, args.out_file, weights, args.p_rate)

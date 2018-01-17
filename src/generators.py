@@ -16,7 +16,6 @@ def data_generator(data, batch_size, audio_transformer, mode='train'):
                 x_batch = np.array(x_batch)
                 x_batch = x_batch.reshape(tuple(list(x_batch.shape) + [1]))
                 y_batch = to_categorical(y_batch, num_classes = len(LABELS))
-                # print(x_batch.shape, y_batch.shape)
                 yield x_batch, y_batch
                 
                 x_batch = []
@@ -52,7 +51,6 @@ def data_generator_ram(data, batch_size, audio_transformer, mode='train'):
                 x_batch = np.array(x_batch)
                 x_batch = x_batch.reshape(tuple(list(x_batch.shape) + [1]))
                 y_batch = to_categorical(y_batch, num_classes = len(LABELS))
-                # print(x_batch.shape, y_batch.shape)
                 yield x_batch, y_batch
                 
                 x_batch = []
@@ -67,7 +65,6 @@ def data_generator_ram(data, batch_size, audio_transformer, mode='train'):
         y_batch = to_categorical(y_batch, num_classes = len(LABELS))
         yield x_batch, y_batch
 
-# better if batch_sie % tta == 0
 def test_generator(files, batch_size, audio_transformer, tta=1):
     if tta < batch_size:
         for start in range(0, len(files), int(batch_size / tta)):

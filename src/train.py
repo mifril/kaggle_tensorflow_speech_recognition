@@ -9,7 +9,6 @@ from utilities import *
 from models import *
 
 from keras.callbacks import *
-# import keras
 
 from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
 
@@ -48,10 +47,7 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
     if args.resize:
         shape = (args.resize_w, args.resize_h, 1)
     else:       
-        # default win_size and win_stride 
         shape = (129, 124, 1)
-        # win_size and win_stride  480_160
-        # shape = (241, 49, 1)
     
     callbacks = [
         EarlyStopping(monitor='val_loss',
@@ -73,7 +69,10 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
     if args.folds:
         for i in range(args.start_fold, len(folds)):
             if args.my_noise:
-                trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk, pl_fold=pl_folds[i])
+                if pl_folds is not None:
+                    trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk, pl_fold=pl_folds[i])
+                else:
+                    trainset, valset = load_fold_my_noise(folds[i], no_unk=args.no_unk, pl_fold=None)
             else:
                 trainset, valset = load_fold(folds[i], no_unk=args.no_unk)
                 
@@ -143,8 +142,6 @@ def train(model_name, args, n_epochs=10000, batch_size=32, patience=5, reduce_ra
             print(confusion_matrix(labels, np.argmax(ho_preds[i], axis=1)))
 
 if __name__ == '__main__':
-    # set_seeds()
-
     parser = argparse.ArgumentParser(description='Train TF-speech model')
     parser.add_argument("--start_lr", type=float, default=1e-3, help="initial learning rate")
     parser.add_argument("--reduce_rate", type=float, default=0.1, help="learning rate reduce rate")

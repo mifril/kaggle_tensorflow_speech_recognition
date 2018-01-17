@@ -14,22 +14,12 @@ from models import *
 import gc
 
 from sklearn.metrics import log_loss, accuracy_score, confusion_matrix
-from tensorflow.python.ops.metrics import mean_per_class_accuracy
 
 def predict_val(args, batch_size=32, wdir=None, tta=1):
     if args.folds:
         if args.fold_type == 'my':
             print('Loading my kfold ...')
-            if args.my_noise:
-                print('Loading my kfold with my noise...')
-                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_NOISE_FILENAME, 'rb'))
-                if args.pl:
-                    pl_folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_PL_FILENAME, 'rb'))
-                else:
-                    pl_folds = None
-            else:
-                print('Loading my kfold andd mutual noise...')
-                folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
+            folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + MY_KFOLD_FILENAME, 'rb'))
         else:
             print('Loading mutual kfold ...')
             folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
@@ -56,46 +46,46 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
         folds_class_acc = []
         folds_class_total = []
         for i in range(args.start_fold, len(folds)):
-            if pl_folds is not None:
-                trainset, valset = load_fold(folds[i], pl_fold=pl_folds[i])
+            if args.my_noise:
+                trainset, valset = load_fold_my_noise(folds[i])
             else:
-                trainset, valset = load_fold(folds[i], pl_fold=None)
-
-            model = get_model(model_f, shape)
-            fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
+                trainset, valset = load_fold(folds[i])
 
             valfiles = [v[2] for v in valset]
             labels = [v[0] for v in valset]
             y_val = to_categorical(labels, num_classes = len(LABELS))
             
-            print(len(valfiles), batch_size, int(np.ceil(len(valfiles) / batch_size)))
-            val_preds = model.predict_generator(test_generator(valfiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(valfiles) / batch_size)), verbose=1)
-            val_p_labels = np.argmax(val_preds, axis=1)
+            model = get_model(model_f, shape)
+            preds_k = []
+            for k in range(args.k_best):
+                fold_wdir = load_k_best_weights_min(model, model_name, k=k, wdir=wdir, fold=i)
+                preds = model.predict_generator(test_generator(valfiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(valfiles) / batch_size)), verbose=1)
+                preds_k.append(preds)
+            preds_k = np.mean(preds_k, axis=0)
+            p_labels = np.argmax(preds_k, axis=1)
 
-            print('VAL: loss = {}, acc = {}'.format(log_loss(y_val, val_preds), accuracy_score(labels, val_p_labels)))
-            conf = confusion_matrix(labels, val_p_labels)
-            print(conf)
+            conf = confusion_matrix(labels, p_labels)
             class_acc = []
             class_total = []
-            print('----------------------------------------------------------------')
             for l in LABELS:
                 total = sum(conf[NAME2ID[l]])
                 acc = 1.0 * conf[NAME2ID[l], NAME2ID[l]] / total
                 class_total.append(total)
                 class_acc.append(acc)
-                print('{}, total: {}, accuracy: {}'.format(l, total,  acc))
-            print('----------------------------------------------------------------')
+            
+            print('Fold ', i)
+            print('loss = {}, acc = {}'.format(log_loss(y_val, preds_k), accuracy_score(labels, p_labels)))
             print('mean per class accuracy: {}'.format(np.mean(class_acc)))
-            print('================================================================')
+            print('----------------------------------------------------')
 
             folds_class_acc.append(class_acc)
             folds_class_total.append(class_total)
-            folds_acc.append(accuracy_score(labels, val_p_labels))
+            folds_acc.append(accuracy_score(labels, p_labels))
             folds_mpc_acc.append(np.mean(class_acc))
 
             fnames = [f.split('\\')[-2] + '_' + f.split('\\')[-1] if len(f.split('\\')) > 2 else f.split('/')[-2] + '_' + f.split('/')[-1] for f in valfiles]
-            dump_preds(val_preds, 'train', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=fnames)
-        
+            dump_preds(preds_k, 'train', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=fnames)
+
         folds_class_acc = np.mean(folds_class_acc, axis=0)
         folds_class_total = np.sum(folds_class_total, axis=0)
         for l in LABELS:
@@ -106,32 +96,9 @@ def predict_val(args, batch_size=32, wdir=None, tta=1):
 
         print('MEAN acc = {}, mpc acc = {}'.format(np.mean(folds_acc), np.mean(folds_mpc_acc)))
 
-    else:
-        model = get_model(model_f, shape)
-        load_best_weights_min(model, model_name, wdir=wdir)
-
-        if hoset is not None:
-            hofiles = [v[2] for v in hoset]
-            labels = [v[0] for v in hoset]
-            y_ho = to_categorical(labels, num_classes = len(LABELS))
-            
-            ho_preds = model.predict_generator(test_generator(hofiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(hofiles) / batch_size)), verbose=1)
-            print('HOLD OUT: loss = {}, acc = {}'.format(log_loss(y_ho, ho_preds), accuracy_score(labels, np.argmax(ho_preds, axis=1))))
-            print(confusion_matrix(labels, np.argmax(ho_preds, axis=1)))
-            dump_preds(ho_preds, 'ho_' + args.preds_file)
-        else:
-            valfiles = [v[2] for v in valset]
-            labels = [v[0] for v in valset]
-            y_val = to_categorical(labels, num_classes = len(LABELS))
-            
-            print(len(valfiles), batch_size, int(np.ceil(len(valfiles) / batch_size)))
-            val_preds = model.predict_generator(test_generator(valfiles, batch_size, audio_transformer, tta=1), int(np.ceil(len(valfiles) / batch_size)), verbose=1)
-            print('HOLD OUT: loss = {}, acc = {}'.format(log_loss(y_val, val_preds), accuracy_score(labels, np.argmax(val_preds, axis=1))))
-            print(confusion_matrix(labels, np.argmax(val_preds, axis=1)))
-            dump_preds(val_preds, 'val_' + args.preds_file)
-
 def predict(args, batch_size=32, wdir=None, tta=1):
     model_name = args.model
+    # default win_size and win_stride
     shape = (129, 124, 1)
 
     if args.resize:
@@ -140,65 +107,31 @@ def predict(args, batch_size=32, wdir=None, tta=1):
     model_f = get_model_f(model_name)
 
     files = glob.glob(os.path.join(TEST_DIR, '*.wav'))
-    if args.pl:
-        files_no_pl = pd.read_csv(NO_PL_DF).fname
-        files = [os.path.join(TEST_DIR, f) for f in files_no_pl]
 
     settings = prepare_settings(args)
     audio_transformer = AudioTransformer(settings)
 
     if args.folds:
+        folds = pickle.load(gzip.open(TRAIN_MODIFIED_DIR + KFOLD_FILENAME, 'rb'))
         preds_folds = []
-        for i in range(args.start_fold, N_FOLDS):
-            model = get_model(model_f, shape)
-            fold_wdir = load_best_weights_min(model, model_name, wdir=wdir, fold=i)
+        for i in range(args.start_fold, len(folds)):
 
-            preds = model.predict_generator(test_generator(files, batch_size, audio_transformer, tta), int(np.ceil(len(files) / (batch_size / tta))), verbose=1)
-            preds_folds.append(preds)
+            preds_k = []
+            for k in range(args.k_best):
+                model = get_model(model_f, shape)
+                fold_wdir = load_k_best_weights_min(model, model_name, k=k, wdir=wdir, fold=i)
+
+                preds = model.predict_generator(test_generator(files, batch_size, audio_transformer, tta), int(np.ceil(len(files) / (batch_size / tta))), verbose=1)
+                preds_k.append(preds)
+
+            preds_folds.append(np.mean(preds_k, axis=0))
 
             dump_preds(preds, 'test', dump_dir=PREDS_DIR + args.preds_file + '/fold_{}'.format(i), fnames=[f.split('\\')[-1] for f in files])
         
         mean_preds = np.mean(preds_folds, axis=0)
         mean_labels = np.argmax(mean_preds, axis=1)
         dump_preds(mean_preds, args.preds_file, fnames=[f.split('\\')[-1] for f in files])
-
-        if args.pl:
-            make_submission_pl(mean_labels, args.out_file)
-        else:
-            make_submission(files, mean_labels, args.out_file)
-    else:
-        model = get_model(model_f, shape)
-        load_best_weights_min(model, model_name, wdir=wdir)
-
-        preds = model.predict_generator(test_generator(files, batch_size, audio_transformer, tta), int(np.ceil(len(files) / (batch_size / tta))), verbose=1)
-        
-        if tta > 1:
-            preds = preds.reshape((len(files), tta, preds.shape[1]))
-            preds = preds.mean(axis=1)
-        
-        print(preds.shape)
-        labels = np.argmax(preds, axis=1)
-        dump_preds(preds, args.preds_file)
-        make_submission(files, labels, args.out_file)
-
-def make_submission_pl(labels, out_file):
-    files_no_pl = pd.read_csv(NO_PL_DF).fname
-    print(labels.shape, len(files_no_pl))
-    df_no_pl = pd.DataFrame({'label': labels}, index=files_no_pl)
-    df_pl = pd.read_csv(PL_DF, index_col='fname')
-    files_pl = df_pl.index
-
-    files_all = glob.glob(os.path.join(TEST_DIR, '*.wav'))
-    files_all = [f.split('\\')[-1] for f in files_all]
-    with open(os.path.join(OUTPUT_DIR, '{}.csv'.format(out_file)), 'w') as fout:
-        fout.write('fname,label\n')
-        for fname in files_all:
-            if fname in files_pl:
-                label = df_pl.loc[fname].label
-            else:
-                label = ID2NAME[df_no_pl.loc[fname].label]
-            fout.write('{},{}\n'.format(fname, label))
-
+        make_submission(files, mean_labels, args.out_file)
 
 def make_submission(files, labels, out_file):
     assert len(files) == labels.shape[0]
@@ -233,7 +166,7 @@ if __name__ == '__main__':
     parser.add_argument("-v", "--val", action="store_true", help="predict on val")
     parser.add_argument("-t", "--test", action="store_true", help="predict on test")
 
-    parser.add_argument("--pl", action="store_true", help="use KFold with pseudo labels")
+    parser.add_argument("--k_best", type=int, default=4, help="use k best epochs")
 
     parser.add_argument('--win_size', type=int, default=256, help='stft window size')
     parser.add_argument('--win_stride', type=int, default=128, help='stft window stride')
